@@ -13,8 +13,14 @@ DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 CONFIG_FILE = "discord-bot/config.json"
 LOGO_PATH = "discord-bot/logo.png"
 
-with open(LOGO_PATH, "rb") as _f:
-    LOGO_BYTES = _f.read()
+# Попытка загрузить логотип (опционально)
+LOGO_BYTES = None
+if os.path.exists(LOGO_PATH):
+    try:
+        with open(LOGO_PATH, "rb") as _f:
+            LOGO_BYTES = _f.read()
+    except Exception as e:
+        print(f"[LOGO] Не удалось загрузить: {e}")
 
 intents = discord.Intents.default()
 intents.guilds = True
@@ -147,13 +153,17 @@ async def create_ticket(
                 embed.add_field(name=label, value=value, inline=False)
     embed.set_footer(text="Нажми кнопку чтобы закрыть тикет")
 
-    file = discord.File(io.BytesIO(LOGO_BYTES), filename="logo.png")
-    embed.set_thumbnail(url="attachment://logo.png")
-
     mention = user.mention
     if ticket_roles:
         mention += " " + " ".join(r.mention for r in ticket_roles)
-    await channel.send(content=mention, file=file, embed=embed, view=CloseView())
+    
+    # Отправляем с логотипом если он есть, иначе без
+    if LOGO_BYTES:
+        file = discord.File(io.BytesIO(LOGO_BYTES), filename="logo.png")
+        embed.set_thumbnail(url="attachment://logo.png")
+        await channel.send(content=mention, file=file, embed=embed, view=CloseView())
+    else:
+        await channel.send(content=mention, embed=embed, view=CloseView())
 
     opened_at = datetime.now()
     ticket_data[channel.id] = {
@@ -606,8 +616,8 @@ async def on_ready():
     bot.add_view(SupportPanel())
     bot.add_view(CloseView())
 
-    # Аватар — только один раз
-    if not _cfg.get("avatar_set"):
+    # Аватар — только один раз (если логотип есть)
+    if LOGO_BYTES and not _cfg.get("avatar_set"):
         try:
             await bot.user.edit(avatar=LOGO_BYTES)
             _cfg["avatar_set"] = True
