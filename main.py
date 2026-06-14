@@ -10,6 +10,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+if not DISCORD_TOKEN:
+    print("ERROR: DISCORD_TOKEN environment variable is not set. Please set it in Railway.")
+    exit(1)
 CONFIG_FILE = "discord-bot/config.json"
 LOGO_PATH = "discord-bot/logo.png"
 
