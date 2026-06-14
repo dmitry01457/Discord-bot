@@ -9,10 +9,6 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
-DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
-if not DISCORD_TOKEN:
-    print("ERROR: DISCORD_TOKEN environment variable is not set. Please set it in Railway.")
-    exit(1)
 CONFIG_FILE = "discord-bot/config.json"
 LOGO_PATH = "discord-bot/logo.png"
 
@@ -648,5 +644,10 @@ async def on_ready():
     print(f"✅ Бот запущен: {bot.user} (ID: {bot.user.id}), серверов: {len(bot.guilds)}")
 
 
-start_keepalive()
-bot.run(DISCORD_TOKEN)
+if __name__ == "__main__":
+    DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
+    if not DISCORD_TOKEN:
+        print("ERROR: DISCORD_TOKEN environment variable is not set. Please set it in Railway.")
+        exit(1)
+    start_keepalive()
+    bot.run(DISCORD_TOKEN)
