@@ -12,19 +12,11 @@ from datetime import datetime
 CONFIG_FILE = "discord-bot/config.json"
 LOGO_PATH = "discord-bot/logo.png"
 
-# Попытка загрузить логотип (опционально)
+# Логотип загружается в on_ready(), не при импорте модуля
 LOGO_BYTES = None
-if os.path.exists(LOGO_PATH):
-    try:
-        with open(LOGO_PATH, "rb") as _f:
-            LOGO_BYTES = _f.read()
-    except Exception as e:
-        print(f"[LOGO] Не удалось загрузить: {e}")
 
-intents = discord.Intents.default()
-intents.guilds = True
-
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+# bot создаётся в __main__, не при импорте модуля
+bot: commands.Bot = None  # type: ignore
 
 
 # ─── Config ───────────────────────────────────────────────────────────────────
@@ -372,276 +364,235 @@ class CloseView(discord.ui.View):
         await channel.delete(reason=f"Тикет закрыт {user}")
 
 
-# ─── Slash-команды ────────────────────────────────────────────────────────────
 
-@bot.tree.command(name="staff", description="Панель набора персонала")
-@app_commands.checks.has_permissions(administrator=True)
-async def slash_staff(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
-    try:
-        embed = discord.Embed(
-            title="👥 Набор на персонал",
-            description=(
-                "Хочешь стать частью команды?\n"
-                "Выбери должность и заполни заявку.\n\n"
-                "**📐 Билдер** — строительство и оформление\n"
-                "**🎬 Медиа** — контент, дизайн, видео\n"
-                "**👮 Стафф** — модерация и управление"
-            ),
-            color=discord.Color.from_rgb(30, 100, 220)
-        )
-        if interaction.guild.icon:
-            embed.set_thumbnail(url=interaction.guild.icon.url)
-        embed.set_footer(text=interaction.guild.name)
-        await interaction.followup.send(embed=embed, view=StaffPanel())
-    except Exception as e:
-        print(f"[/staff] Ошибка: {e}")
-        await interaction.followup.send(f"❌ Ошибка: {e}", ephemeral=True)
+# ─── Bot setup (called at runtime, not at import time) ────────────────────────
 
+def setup_bot(bot: commands.Bot):
+    """Register all commands and events on the bot instance.
+    Called from __main__ after the bot object is created, so that no
+    decorator code runs during the build/import phase."""
 
-@bot.tree.command(name="support", description="Панель поддержки")
-@app_commands.checks.has_permissions(administrator=True)
-async def slash_support(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
-    try:
-        embed = discord.Embed(
-            title="🎫 Служба поддержки",
-            description=(
-                "Нужна помощь? Выбери категорию и открой тикет.\n\n"
-                "**⚖️ Апелляция** — обжаловать наказание\n"
-                "**⚠️ Жалоба на игрока** — сообщить о нарушителе\n"
-                "**📋 Жалоба на персонал** — жалоба на сотрудника\n"
-                "**❓ Общие вопросы** — любые другие вопросы"
-            ),
-            color=discord.Color.from_rgb(30, 100, 220)
-        )
-        if interaction.guild.icon:
-            embed.set_thumbnail(url=interaction.guild.icon.url)
-        embed.set_footer(text=interaction.guild.name)
-        await interaction.followup.send(embed=embed, view=SupportPanel())
-    except Exception as e:
-        print(f"[/support] Ошибка: {e}")
-        await interaction.followup.send(f"❌ Ошибка: {e}", ephemeral=True)
+    # ─── Slash-команды ────────────────────────────────────────────────────────
 
+    @bot.tree.command(name="staff", description="Панель набора персонала")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def slash_staff(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            embed = discord.Embed(
+                title="👥 Набор на персонал",
+                description=(
+                    "Хочешь стать частью команды?\n"
+                    "Выбери должность и заполни заявку.\n\n"
+                    "**📐 Билдер** — строительство и оформление\n"
+                    "**🎬 Медиа** — контент, дизайн, видео\n"
+                    "**👮 Стафф** — модерация и управление"
+                ),
+                color=discord.Color.from_rgb(30, 100, 220)
+            )
+            if interaction.guild.icon:
+                embed.set_thumbnail(url=interaction.guild.icon.url)
+            embed.set_footer(text=interaction.guild.name)
+            await interaction.followup.send(embed=embed, view=StaffPanel())
+        except Exception as e:
+            print(f"[/staff] Ошибка: {e}")
+            await interaction.followup.send(f"❌ Ошибка: {e}", ephemeral=True)
 
-@bot.tree.command(name="logs", description="Установить канал для логов")
-@app_commands.checks.has_permissions(administrator=True)
-async def slash_logs(interaction: discord.Interaction, channel: discord.TextChannel):
-    _cfg.setdefault(str(interaction.guild.id), {})["log_channel_id"] = channel.id
-    save_cfg()
-    await interaction.response.send_message(f"✅ Лог-канал: {channel.mention}", ephemeral=True)
+    @bot.tree.command(name="support", description="Панель поддержки")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def slash_support(interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=False)
+        try:
+            embed = discord.Embed(
+                title="🎫 Служба поддержки",
+                description=(
+                    "Нужна помощь? Выбери категорию и открой тикет.\n\n"
+                    "**⚖️ Апелляция** — обжаловать наказание\n"
+                    "**⚠️ Жалоба на игрока** — сообщить о нарушителе\n"
+                    "**📋 Жалоба на персонал** — жалоба на сотрудника\n"
+                    "**❓ Общие вопросы** — любые другие вопросы"
+                ),
+                color=discord.Color.from_rgb(30, 100, 220)
+            )
+            if interaction.guild.icon:
+                embed.set_thumbnail(url=interaction.guild.icon.url)
+            embed.set_footer(text=interaction.guild.name)
+            await interaction.followup.send(embed=embed, view=SupportPanel())
+        except Exception as e:
+            print(f"[/support] Ошибка: {e}")
+            await interaction.followup.send(f"❌ Ошибка: {e}", ephemeral=True)
 
-
-@bot.tree.command(name="close", description="Закрыть тикет")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def slash_close(interaction: discord.Interaction):
-    user = interaction.user
-    channel = interaction.channel
-    embed = discord.Embed(
-        title="🔒 Тикет закрыт",
-        description=f"Закрыт {user.mention}. Канал удалится через 5 сек.",
-        color=discord.Color.red(), timestamp=datetime.now()
-    )
-    await interaction.response.send_message(embed=embed)
-
-    closed_at = datetime.now()
-    td = ticket_data.pop(channel.id, None)
-
-    log = discord.Embed(title="🔒 Тикет закрыт", color=discord.Color.red(), timestamp=closed_at)
-    log.set_author(name=str(user), icon_url=user.display_avatar.url)
-    log.set_thumbnail(url=user.display_avatar.url)
-    log.add_field(name="🔐 Закрыл", value=f"{user.mention}\n`{user}` (ID: `{user.id}`)", inline=True)
-    log.add_field(name="📌 Канал", value=f"`{channel.name}`", inline=True)
-    if td:
-        opener = td["user"]
-        log.add_field(name="📁 Категория", value=td["category"], inline=True)
-        log.add_field(name="👤 Открыл", value=f"{opener.mention}\n`{opener}`", inline=True)
-        duration = closed_at - td["opened_at"]
-        total = int(duration.total_seconds())
-        h, rem = divmod(total, 3600)
-        m, s = divmod(rem, 60)
-        dur_str = (f"{h}ч " if h else "") + (f"{m}м " if m else "") + f"{s}с"
-        log.add_field(name="⏱️ Длительность", value=dur_str, inline=True)
-        self_close = opener.id == user.id
-        log.add_field(name="ℹ️ Закрыл сам?", value="Да" if self_close else "Нет (стафф)", inline=True)
-    log.set_footer(text=f"Канал ID: {channel.id}")
-    await send_log(interaction.guild, log)
-    await asyncio.sleep(5)
-    await channel.delete()
-
-
-TICKET_NAMES = {
-    "appeal": "⚖️ Апелляция",
-    "player_report": "⚠️ Жалоба на игрока",
-    "staff_report": "📋 Жалоба на персонал",
-    "general": "❓ Общие вопросы",
-    "builder": "📐 Билдер",
-    "media": "🎬 Медиа",
-    "staff_app": "👮 Стафф",
-}
-
-
-class RoleSelectView(discord.ui.View):
-    def __init__(self, ticket_key: str, ticket_name: str, guild_id: int):
-        super().__init__(timeout=180)
-        self.ticket_key = ticket_key
-        self.ticket_name = ticket_name
-        self.guild_id = guild_id
-        self.chosen: list[discord.Role] = []
-
-    @discord.ui.select(
-        cls=discord.ui.RoleSelect,
-        placeholder="Выбери роли (можно несколько)...",
-        min_values=0,
-        max_values=25,
-    )
-    async def role_select(self, interaction: discord.Interaction, select: discord.ui.RoleSelect):
-        self.chosen = list(select.values)
-        role_text = " ".join(r.mention for r in self.chosen) if self.chosen else "_(нет)_"
-        await interaction.response.edit_message(
-            content=f"**{self.ticket_name}** — выбрано: {role_text}\nНажми **Сохранить**.",
-            view=self,
-        )
-
-    @discord.ui.button(label="✅ Сохранить", style=discord.ButtonStyle.success, row=1)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild_cfg = _cfg.setdefault(str(self.guild_id), {})
-        guild_cfg.setdefault("ticket_roles", {})[self.ticket_key] = [r.id for r in self.chosen]
+    @bot.tree.command(name="logs", description="Установить канал для логов")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def slash_logs(interaction: discord.Interaction, channel: discord.TextChannel):
+        _cfg.setdefault(str(interaction.guild.id), {})["log_channel_id"] = channel.id
         save_cfg()
-        role_text = " ".join(r.mention for r in self.chosen) if self.chosen else "_(нет)_"
-        await interaction.response.edit_message(
-            content=f"✅ **{self.ticket_name}** — роли сохранены: {role_text}",
-            view=None,
-        )
+        await interaction.response.send_message(f"✅ Лог-канал: {channel.mention}", ephemeral=True)
 
-    @discord.ui.button(label="❌ Отмена", style=discord.ButtonStyle.secondary, row=1)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="Отменено.", view=None)
-
-
-@bot.tree.command(name="ticket-roles", description="Настроить роли для типа тикета")
-@app_commands.checks.has_permissions(administrator=True)
-@app_commands.choices(ticket=[
-    app_commands.Choice(name=v, value=k) for k, v in TICKET_NAMES.items()
-])
-async def slash_ticket_roles(interaction: discord.Interaction, ticket: str):
-    name = TICKET_NAMES.get(ticket, ticket)
-    view = RoleSelectView(ticket, name, interaction.guild.id)
-    await interaction.response.send_message(
-        f"Выбери роли для **{name}**:", view=view, ephemeral=True
-    )
-
-
-@bot.tree.command(name="ticket-roles-clear", description="Сбросить роли для типа тикета")
-@app_commands.checks.has_permissions(administrator=True)
-@app_commands.choices(ticket=[
-    app_commands.Choice(name=v, value=k) for k, v in TICKET_NAMES.items()
-])
-async def slash_ticket_roles_clear(interaction: discord.Interaction, ticket: str):
-    guild_cfg = _cfg.setdefault(str(interaction.guild.id), {})
-    guild_cfg.setdefault("ticket_roles", {}).pop(ticket, None)
-    save_cfg()
-    name = TICKET_NAMES.get(ticket, ticket)
-    await interaction.response.send_message(
-        f"🗑️ Роли для **{name}** сброшены — теперь при создании тикета роли не упоминаются.", ephemeral=True
-    )
-
-
-@bot.tree.command(name="add-user", description="Добавить пользователя в тикет")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def slash_add_user(interaction: discord.Interaction, user: discord.Member):
-    try:
+    @bot.tree.command(name="close", description="Закрыть тикет")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def slash_close(interaction: discord.Interaction):
+        user = interaction.user
         channel = interaction.channel
-        await channel.set_permissions(
-            user,
-            read_messages=True,
-            send_messages=True,
-            attach_files=True,
-            embed_links=True,
-        )
-        await interaction.response.send_message(
-            f"✅ {user.mention} добавлен в тикет.", ephemeral=True
-        )
         embed = discord.Embed(
-            description=f"➕ {interaction.user.mention} добавил {user.mention} в тикет.",
-            color=discord.Color.blurple(),
+            title="🔒 Тикет закрыт",
+            description=f"Закрыт {user.mention}. Канал удалится через 5 сек.",
+            color=discord.Color.red(), timestamp=datetime.now()
         )
-        await channel.send(embed=embed)
-    except Exception as e:
-        print(f"[/add-user] Ошибка: {e}")
-        if not interaction.response.is_done():
-            await interaction.response.send_message(f"❌ Ошибка: {e}", ephemeral=True)
+        await interaction.response.send_message(embed=embed)
 
+        closed_at = datetime.now()
+        td = ticket_data.pop(channel.id, None)
 
-@bot.tree.command(name="remove-user", description="Убрать пользователя из тикета")
-@app_commands.checks.has_permissions(manage_channels=True)
-async def slash_remove_user(interaction: discord.Interaction, user: discord.Member):
-    try:
-        channel = interaction.channel
-        await channel.set_permissions(user, overwrite=None)
+        log = discord.Embed(title="🔒 Тикет закрыт", color=discord.Color.red(), timestamp=closed_at)
+        log.set_author(name=str(user), icon_url=user.display_avatar.url)
+        log.set_thumbnail(url=user.display_avatar.url)
+        log.add_field(name="🔐 Закрыл", value=f"{user.mention}\n`{user}` (ID: `{user.id}`)", inline=True)
+        log.add_field(name="📌 Канал", value=f"`{channel.name}`", inline=True)
+        if td:
+            opener = td["user"]
+            log.add_field(name="📁 Категория", value=td["category"], inline=True)
+            log.add_field(name="👤 Открыл", value=f"{opener.mention}\n`{opener}`", inline=True)
+            duration = closed_at - td["opened_at"]
+            total = int(duration.total_seconds())
+            h, rem = divmod(total, 3600)
+            m, s = divmod(rem, 60)
+            dur_str = (f"{h}ч " if h else "") + (f"{m}м " if m else "") + f"{s}с"
+            log.add_field(name="⏱️ Длительность", value=dur_str, inline=True)
+            self_close = opener.id == user.id
+            log.add_field(name="ℹ️ Закрыл сам?", value="Да" if self_close else "Нет (стафф)", inline=True)
+        log.set_footer(text=f"Канал ID: {channel.id}")
+        await send_log(interaction.guild, log)
+        await asyncio.sleep(5)
+        await channel.delete()
+
+    @bot.tree.command(name="ticket-roles", description="Настроить роли для типа тикета")
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.choices(ticket=[
+        app_commands.Choice(name=v, value=k) for k, v in TICKET_NAMES.items()
+    ])
+    async def slash_ticket_roles(interaction: discord.Interaction, ticket: str):
+        name = TICKET_NAMES.get(ticket, ticket)
+        view = RoleSelectView(ticket, name, interaction.guild.id)
         await interaction.response.send_message(
-            f"✅ {user.mention} убран из тикета.", ephemeral=True
+            f"Выбери роли для **{name}**:", view=view, ephemeral=True
         )
-        embed = discord.Embed(
-            description=f"➖ {interaction.user.mention} убрал {user.mention} из тикета.",
-            color=discord.Color.orange(),
+
+    @bot.tree.command(name="ticket-roles-clear", description="Сбросить роли для типа тикета")
+    @app_commands.checks.has_permissions(administrator=True)
+    @app_commands.choices(ticket=[
+        app_commands.Choice(name=v, value=k) for k, v in TICKET_NAMES.items()
+    ])
+    async def slash_ticket_roles_clear(interaction: discord.Interaction, ticket: str):
+        guild_cfg = _cfg.setdefault(str(interaction.guild.id), {})
+        guild_cfg.setdefault("ticket_roles", {}).pop(ticket, None)
+        save_cfg()
+        name = TICKET_NAMES.get(ticket, ticket)
+        await interaction.response.send_message(
+            f"🗑️ Роли для **{name}** сброшены — теперь при создании тикета роли не упоминаются.", ephemeral=True
         )
-        await channel.send(embed=embed)
-    except Exception as e:
-        print(f"[/remove-user] Ошибка: {e}")
-        if not interaction.response.is_done():
-            await interaction.response.send_message(f"❌ Ошибка: {e}", ephemeral=True)
 
+    @bot.tree.command(name="add-user", description="Добавить пользователя в тикет")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def slash_add_user(interaction: discord.Interaction, user: discord.Member):
+        try:
+            channel = interaction.channel
+            await channel.set_permissions(
+                user,
+                read_messages=True,
+                send_messages=True,
+                attach_files=True,
+                embed_links=True,
+            )
+            await interaction.response.send_message(
+                f"✅ {user.mention} добавлен в тикет.", ephemeral=True
+            )
+            embed = discord.Embed(
+                description=f"➕ {interaction.user.mention} добавил {user.mention} в тикет.",
+                color=discord.Color.blurple(),
+            )
+            await channel.send(embed=embed)
+        except Exception as e:
+            print(f"[/add-user] Ошибка: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(f"❌ Ошибка: {e}", ephemeral=True)
 
-@bot.tree.error
-async def on_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    print(f"[TREE ERROR] {interaction.command and interaction.command.name}: {error}")
-    msg = "❌ Нет прав." if isinstance(error, app_commands.MissingPermissions) else f"❌ Ошибка: {error}"
-    try:
-        if interaction.response.is_done():
-            await interaction.followup.send(msg, ephemeral=True)
+    @bot.tree.command(name="remove-user", description="Убрать пользователя из тикета")
+    @app_commands.checks.has_permissions(manage_channels=True)
+    async def slash_remove_user(interaction: discord.Interaction, user: discord.Member):
+        try:
+            channel = interaction.channel
+            await channel.set_permissions(user, overwrite=None)
+            await interaction.response.send_message(
+                f"✅ {user.mention} убран из тикета.", ephemeral=True
+            )
+            embed = discord.Embed(
+                description=f"➖ {interaction.user.mention} убрал {user.mention} из тикета.",
+                color=discord.Color.orange(),
+            )
+            await channel.send(embed=embed)
+        except Exception as e:
+            print(f"[/remove-user] Ошибка: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(f"❌ Ошибка: {e}", ephemeral=True)
+
+    @bot.tree.error
+    async def on_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+        print(f"[TREE ERROR] {interaction.command and interaction.command.name}: {error}")
+        msg = "❌ Нет прав." if isinstance(error, app_commands.MissingPermissions) else f"❌ Ошибка: {error}"
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except Exception:
+            pass
+
+    # ─── on_ready ─────────────────────────────────────────────────────────────
+
+    @bot.event
+    async def on_ready():
+        global LOGO_BYTES
+        # Загружаем логотип при старте бота, не при импорте модуля
+        if LOGO_BYTES is None and os.path.exists(LOGO_PATH):
+            try:
+                with open(LOGO_PATH, "rb") as _f:
+                    LOGO_BYTES = _f.read()
+            except Exception as e:
+                print(f"[LOGO] Не удалось загрузить: {e}")
+
+        load_cfg()
+        bot.add_view(StaffPanel())
+        bot.add_view(SupportPanel())
+        bot.add_view(CloseView())
+
+        # Аватар — только один раз (если логотип есть)
+        if LOGO_BYTES and not _cfg.get("avatar_set"):
+            try:
+                await bot.user.edit(avatar=LOGO_BYTES)
+                _cfg["avatar_set"] = True
+                save_cfg()
+                print("Аватар обновлён")
+            except Exception as e:
+                print(f"Аватар: {e}")
+
+        # Синхронизация команд — только один раз
+        if not _cfg.get("commands_synced"):
+            try:
+                total = 0
+                for guild in bot.guilds:
+                    bot.tree.copy_global_to(guild=guild)
+                    synced = await bot.tree.sync(guild=guild)
+                    total += len(synced)
+                _cfg["commands_synced"] = True
+                save_cfg()
+                print(f"Команды синхронизированы: {total}")
+            except Exception as e:
+                print(f"Синхронизация: {e}")
         else:
-            await interaction.response.send_message(msg, ephemeral=True)
-    except Exception:
-        pass
+            print("Команды уже синхронизированы, пропускаем")
 
-
-# ─── on_ready ─────────────────────────────────────────────────────────────────
-
-@bot.event
-async def on_ready():
-    load_cfg()
-    bot.add_view(StaffPanel())
-    bot.add_view(SupportPanel())
-    bot.add_view(CloseView())
-
-    # Аватар — только один раз (если логотип есть)
-    if LOGO_BYTES and not _cfg.get("avatar_set"):
-        try:
-            await bot.user.edit(avatar=LOGO_BYTES)
-            _cfg["avatar_set"] = True
-            save_cfg()
-            print("Аватар обновлён")
-        except Exception as e:
-            print(f"Аватар: {e}")
-
-    # Синхронизация команд — только один раз
-    if not _cfg.get("commands_synced"):
-        try:
-            total = 0
-            for guild in bot.guilds:
-                bot.tree.copy_global_to(guild=guild)
-                synced = await bot.tree.sync(guild=guild)
-                total += len(synced)
-            _cfg["commands_synced"] = True
-            save_cfg()
-            print(f"Команды синхронизированы: {total}")
-        except Exception as e:
-            print(f"Синхронизация: {e}")
-    else:
-        print("Команды уже синхронизированы, пропускаем")
-
-    print(f"✅ Бот запущен: {bot.user} (ID: {bot.user.id}), серверов: {len(bot.guilds)}")
+        print(f"✅ Бот запущен: {bot.user} (ID: {bot.user.id}), серверов: {len(bot.guilds)}")
 
 
 if __name__ == "__main__":
@@ -649,5 +600,11 @@ if __name__ == "__main__":
     if not DISCORD_TOKEN:
         print("ERROR: DISCORD_TOKEN environment variable is not set. Please set it in Railway.")
         exit(1)
+
+    intents = discord.Intents.default()
+    intents.guilds = True
+    bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+
+    setup_bot(bot)
     start_keepalive()
     bot.run(DISCORD_TOKEN)
